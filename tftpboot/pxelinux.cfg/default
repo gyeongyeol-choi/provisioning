@@ -1,0 +1,14 @@
+# D-I config version 2.0
+# search path for the c32 support libraries (libcom32, libutil etc.)
+path commission/amd64/boot-screens/
+include commission/amd64/boot-screens/menu.cfg
+default commission/amd64/boot-screens/vesamenu.c32
+
+prompt 0
+default install_comm
+timeout 10
+
+label install_comm
+	menu label Install_comm (from PXELINUX)
+	kernel commission/amd64/linux
+	append preseed/url=tftp://[TFTP_IP]/preseed/comm.seed initrd=commission/amd64/initrd.gz live-installer/net-image=tftp://[TFTP_IP]/filesystem.squashfs debian-installer/locale=en_US.UTF-8 console-setup/ask_detect=false keyboard-configuration/layoutcode=us vga=788 hostname=ProLinux domain=ProLinux ramdisk_size=16432 root=/dev/rd/0 quiet --- netcfg/choose_interface=eno1

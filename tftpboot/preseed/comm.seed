@@ -1,0 +1,173 @@
+# For PXE Booting (Download the package)
+d-i debian-installer/allow_unauthenticated string true
+d-i mirror/protocol string http
+d-i mirror/country string manual
+d-i mirror/http/hostname string [WEBTOB_IP]:[WEBTOB_PORT]
+d-i mirror/http/directory string /iso/prolinux
+d-i mirror/http/proxy string
+d-i apt-setup/main boolean true
+d-i apt-setup/extras boolean true
+d-i apt-setup/security_host string [WEBTOB_IP]:[WEBTOB_PORT]
+d-i apt-setup/security_path string /iso/prolinux
+
+#d-i preseed/late_command string \
+#  wget -O target/etc/netplan/01-netcfg.yaml "http://192.168.9.82:8080/01-netcfg.yaml"; \
+#  echo 'tmax    ALL=NOPASSWD: /usr/bin/apt-get , /usr/bin/aptitude' >> target/etc/sudoers
+
+# Suggest LVM by default.
+d-i	partman-auto/init_automatically_partition	string some_device_lvm
+d-i	partman-auto/init_automatically_partition	seen false
+# Install the Ubuntu Server seed.
+#tasksel	tasksel/force-tasks	string server, prozone-c, prozone-d, prozone-m
+tasksel	tasksel/force-tasks	string server
+#tasksel	tasksel/skip-tasks	string prozone-c, prozone-d, prozone-m
+# Only install basic language packs. Let tasksel ask about tasks.
+d-i	pkgsel/language-pack-patterns	string
+# No language support packages.
+d-i	pkgsel/install-language-support	boolean false
+# Verbose output and no boot splash screen.
+d-i	debian-installer/quiet	boolean false
+d-i	debian-installer/splash	boolean false
+# Install the debconf oem-config frontend (if in OEM mode).
+d-i	oem-config-udeb/frontend	string debconf
+# Wait for two seconds in grub
+d-i	grub-installer/timeout	string 5
+# Add the network and tasks oem-config steps by default.
+oem-config	oem-config/steps	multiselect language, timezone, keyboard, user, network, tasks
+#
+d-i	debconf/priority	string	critical
+#
+# locale and keyboard configuration
+d-i	debian-installer/locale	string	en_US.UTF-8
+d-i	console-setup/ask_detect	boolean	false
+d-i	keyboard-configuration/xkb-keymap	select	us
+d-i	keyboard-configuration/layout	string	"United State"
+#
+# Hostname and network settings
+d-i	netcfg/choose_interface select auto
+d-i	netcfg/dhcp_timeout string 0 #30
+# configure network manually or do not
+#d-i netcfg/disable_autoconfig boolean true
+d-i	netcfg/dhcp_failed note
+d-i	netcfg/dhcp_options select Do not configure the network at this time
+d-i	netcfg/get_hostname string ProLinux
+d-i	netcfg/get_domain string ProLinux
+#
+# Account setup
+# allow root login (default = false)
+d-i	passwd/root-login	boolean 	true
+# Root Password
+d-i	passwd/root-password	password	tmax@23
+d-i	passwd/root-password-again	password	tmax@23
+#
+# normal user
+# allow normal user account (default = true)
+# d-i	passwd/make-user	boolean	false
+d-i 	passwd/user-fullname	string Tmax
+# username must start with a lower-case letter
+d-i 	passwd/username		string tmax 
+# normal user password
+d-i	passwd/user-password	password	tmax@23
+d-i	passwd/user-password-again	password	tmax@23
+d-i	user-setup/allow-password-weak	boolean	true
+d-i	user-setup/encrypt-home	boolean	false
+#
+# Only ask the UTC question if there are other operating systems installed.
+d-i	clock-setup/utc-auto	boolean true
+#d-i	time/zone	string	UTC
+d-i	time/zone	string	Asia/Seoul
+d-i	clock-setup/ntp	boolean	true
+#
+# Disk partition:----------------------------------------------------------
+# Choose disk to install
+d-i 	partman-auto/disk	string	/dev/sda
+#
+# Unmount partitions that are in use?
+d-i	partman/unmount_active	boolean	true
+#
+# Remove any existing LVM and RAID setup without prompting
+d-i 	partman-auto/purge_lvm_from_device	boolean true
+d-i	partman-md/device_remove_md	boolean	true
+d-i	partman-md/confirm	boolean	true
+d-i 	partman-lvm/device_remove_lvm	boolean	true
+d-i 	partman-lvm/device_remove_lvm_span	boolean	true
+d-i	partman-lvm/confirm	boolean	true
+d-i 	partman-lvm/confirm_nooverwrite	boolean	true
+#
+# The presently available methods are:
+# - regular: use the usual partition types for your architecture
+# - lvm:     use LVM to partition the disk
+# - crypto:  use LVM within an encrypted partition
+#
+# You can choose one of the three predefined partitioning recipes:
+# - atomic: all files in one partition
+# - home:   separate /home partition
+# - multi:  separate /home, /var, and /tmp partitions
+d-i 	partman-auto/choose_recipe	atomic
+d-i     partman-auto/method     string  regular
+#d-i     partman-auto/method     string  lvm
+#d-i     partman-auto-lvm/new_vg_name    string  tmaxlinux_vg
+#d-i     partman-auto-lvm/guided_size    string  max
+d-i	partman/default_filesystem	string	ext4
+#
+#
+# recipe: <minimal size> <priority> <maximal size> <parted fs>
+#d-i	preseed/include	string	regular-recipe.cfg
+#d-i	preseed/include	string	lvm-recipe.cfg
+#
+# Auto confirm : ====================================================
+d-i 	partman-partitioning/confirm_write_new_label	boolean	true
+d-i 	partman/choose_partition	select	finish
+d-i 	partman/confirm	boolean	true
+d-i 	partman/confirm_nooverwrite	boolean	true
+d-i 	partman-auto/confirm	boolean	true
+#
+# #====================================================================
+#
+# kr.archive.ubuntu.com
+#d-i	mirror/country	string	KR
+# HTTP proxy information (blank for none)
+#d-i	mirror/http/proxy	string
+#
+# No automatically update
+#d-i	pkgsel/include	string	update-motd
+d-i	pkgsel/update-policy	select	none
+#
+# Postfix: General type of mail configuration:
+postfix	postfix/main_mailer_type	select No configuration
+#
+# Install the GRUB boot loader to the master boot record?
+d-i grub-installer/only_debian boolean true
+d-i grub-installer/with_other_os boolean true
+
+d-i grub-installer/choose_bootdev   select  /dev/sda
+#d-i partman-auto/disk	string /dev/sdb
+#d-i grub-installer/bootdev	string	/dev/sdb
+#grub-pc grub-pc/install_devices string /dev/sdb
+#grub-installer	grub-installer/choose_bootdev	select 	/dev/sda
+#grub-installer grub-installer/grub2_instead_of_grub_legacy boolean true
+#
+# Finish the installation note
+#d-i finish-install/reboot_in_progress note
+#
+# preseed early command
+#d-i partman/early_command string wget -O target/root/early_cmd_SSD.sh "http://192.168.9.82:8080/early_cmd_SSD.sh";\
+#   sh target/root/early_cmd_SSD.sh;
+#d-i	partman/early_command	string	sh /cdrom/preseed/early_cmd_SSD.sh
+#d-i	preseed/early_command	string	sh /cdrom/preseed/early_cmd.sh
+#
+
+# preseed late command
+#d-i preseed/late_command string\
+#   wget -O target/root/late_cmd.sh "http://192.168.8.34:8080/late_cmd.sh";\
+#       wget -O target/etc/netplan/01-netcfg.yaml "http://192.168.8.34:8080/01-netcfg.yaml";\
+#           wget -O target/bin/tmaxlinux_cfg_after_installed.sh "http://192.168.8.34:8080/tmaxlinux_cfg_after_installed.sh";\
+#               chroot /target chmod +x /root/late_cmd.sh;\
+#                   chroot /target bash /root/late_cmd.sh;\
+#                       chroot /target rm -f /root/late_cmd.sh;
+
+# Machine Notify (+ Hardware Test)
+d-i preseed/late_command string \
+  wget -O target/root/curl_comm.sh "http://[WEBTOB_IP]:[WEBTOB_PORT]/curl_comm.sh"; \
+  chroot /target chmod +x /root/curl_comm.sh; \
+  sh /target/root/curl_comm.sh > /root/test.log;

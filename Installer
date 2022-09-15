@@ -1,0 +1,114 @@
+#!/bin/bash
+# This script is used for OS Provisoning Server (DHCP, IPMI, REPO)
+# It valids in Ubuntu, ProLinux 4
+
+# Enter Input Parameter
+echo "############## Enter Input Parameter ##############"
+echo "### Common ###"
+read -e -p "Server IP: " SERVER_IP
+read -e -p "SSH ID: " SSH_ID
+read -e -p "SSH Password: " SSH_PW
+read -e -p "Server Port (ProObject): " SERVER_PORT
+echo "### DHCP ###"
+read -e -p "Subnet (e.g. 192.168.6.0): " SUBNET
+echo "# IP RANGE (START_IP~END_IP) #"
+read -e -p "Start IP: " START_IP
+read -e -p "End IP: " END_IP
+read -e -p "SubnetMask: " BROADCAST_IP
+read -e -p "Gateway: " GATEWAY_IP
+read -e -p "MAC Interface: " MAC_INTERFACE
+echo "### REPO ###"
+read -e -p "WebtoB Port Number: " WEBTOB_PORT
+read -e -p "WebtoB Path: " WEBTOB_PATH
+read -e -p "TFTP Path: " TFTP_PATH
+
+# 1. Installing Related Packages (must install webtob previously)
+echo "############## Installing Realated Package... ##############"
+sudo apt-get install tftpd-hpa inetutils-inetd isc-dhcp-server fping ipmitool amtterm
+
+# 2. Configuring TFTP Server
+echo "############## Cofiguring TFTP Server... ##############"
+echo 'RUN_DAEMON="yes"' >> /etc/default/tftpd-hpa
+echo 'OPTIONS="-l -s /var/lib/tftpboot"' >> /etc/default/tftpd-hpa
+echo 'tftp    dgram   udp    wait    root    /usr/sbin/in.tftpd /usr/sbin/in.tftpd -s /var/lib/tftpboot' >> /etc/inetd.conf
+
+systemctl restart tftpd-hpa
+systemctl status tftpd-hpa
+
+# 3. Copying Boot images to PXE Server (Bootloader, Kernel, Initial Ramdisk)
+echo "############## Copying Boot Images TFTP Server... ##############"
+cp -fr tftpboot/* /var/lib/tftpboot/
+
+# 4. Configuring DHCP Server (change the IP, DNS, etc to the vars)
+echo "############## Configuring DHCP Server... ##############"
+echo "option arch code 93 = unsigned integer 16; # RFC4578
+allow booting;
+allow bootp;
+
+subnet $SUBNET netmask 255.255.255.0 {
+	range $START_IP $END_IP;
+	option broadcast-address $BROADCAST_IP;
+	option routers $GATEWAY_IP;
+	option domain-name-servers 168.126.63.1;
+	next-server $SERVER_IP;
+	ddns-updates off;
+	if option arch = 00:07 { # Boot Mode: UEFI
+		filename \"grubnetx64.efi.signed\";
+	}
+	else { # Boot Mode: Legacy
+		filename \"pxelinux.0\";
+	}
+}" >> /etc/dhcp/dhcpd.conf
+
+echo "INTERFACESv4="$MAC_INTERFACE"" > /etc/default/isc-dhcp-server
+
+systemctl restart isc-dhcp-server
+systemctl status isc-dhcp-server
+
+# 5. Apply IPMI Module
+modprobe ipmi_devintf
+modprobe ipmi_si
+modprobe ipmi_msghandler
+
+# 6. Register Metadata (Server) into DB
+echo "############## Registering Metadata (Server) into DB... ##############"
+# (1) DHCP SERVER (Legacy)
+curl -X POST http://$SERVER_IP:$SERVER_PORT/sysmaster/server/Server?action=Create -d '{
+"dto": { 
+"serverName": "DHCP SERVER", 
+"serverType": "DHCP", 
+"serverIP": "172.21.6.2", 
+"sshID": "root", 
+"sshPW": "tmax@23", 
+"serverDescription": "This is DHCP Server", 
+"serverCreatedUser": "Administrator", 
+"ipRangeList": [ 
+"172.31.6.2~172.31.6.100" 
+]}}' -H "Content-Type: application/json" -H 'token: eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJUbWF4LVByb0F1dGgiLCJpZCI6ImFkbWluQHRtYXguY28ua3IiLCJleHAiOjE1NjU2Nzg3NjUsInV1aWQiOiI0MDAzMThhZC03NDRiLTQ1MjYtYTgyYS1lYjcwMTgwODYzMTQifQ.1hOnWHQ5aYEZfhb8HKOxUH2IA7Z1AGXuT3rQ_Q6A6Rc'
+
+# (2) IPMI SERVER
+curl -X POST http://$SERVER_IP:$SERVER_PORT/sysmaster/server/Server?action=Create -d '{
+"dto": {
+"serverName": "IPMI SERVER",
+"serverType": "IPMI",
+"serverIP": "172.21.6.2",
+"sshID": "root",
+"sshPW": "tmax@23",
+"serverDescription": "This is IPMI Server",
+"serverCreatedUser": "Administrator"}}' -H "Content-Type: application/json" -H 'token: eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJUbWF4LVByb0F1dGgiLCJpZCI6ImFkbWluQHRtYXguY28ua3IiLCJleHAiOjE1NjU2Nzg3NjUsInV1aWQiOiI0MDAzMThhZC03NDRiLTQ1MjYtYTgyYS1lYjcwMTgwODYzMTQifQ.1hOnWHQ5aYEZfhb8HKOxUH2IA7Z1AGXuT3rQ_Q6A6Rc'
+
+
+# (3) REPO SERVER
+curl -X POST http://$SERVER_IP:$SERVER_PORT/sysmaster/server/Server?action=Create -d '{
+"dto": {
+"serverName": "REPO SERVER",
+"serverType": "REPO",
+"serverIP": "172.21.6.2",                  
+"sshID": "root",
+"sshPW": "tmax@23",                          
+"serverDescription": "This is Repo Server",
+"serverCreatedUser": "Administrator",
+"webtobPath": "/root/webtob/docs",
+"webtobPort": "5666",
+"pxePath": "/var/lib/tftpboot"}}' -H "Content-Type: application/json" -H 'token: eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJUbWF4LVByb0F1dGgiLCJpZCI6ImFkbWluQHRtYXguY28ua3IiLCJleHAiOjE1NjU2Nzg3NjUsInV1aWQiOiI0MDAzMThhZC03NDRiLTQ1MjYtYTgyYS1lYjcwMTgwODYzMTQifQ.1hOnWHQ5aYEZfhb8HKOxUH2IA7Z1AGXuT3rQ_Q6A6Rc'
+
